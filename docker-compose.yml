@@ -3,20 +3,49 @@ version: "3"
 services:
   nextcloud:
     image: linuxserver/nextcloud
-    container_name: nextcloud
+    container_name: nextcloud_app
+    depends_on:
+      - db
+    env_file:
+     - db.env
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Stockholm
-    volumes:
-      - nextcloud_config:/config
-      - nextcloud_data:/data
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=nextcloud
+    networks:
+      - nextcloud_db
+      - proxy
     ports:
       - 443:443
     restart: always
+    volumes:
+      - nextcloud_config:/config
+      - nextcloud_data:/data
+
+  db:
+    image: postgres:alpine
+    container_name: nextcloud_db
+    env_file:
+      - db.env
+    networks:
+      - nextcloud_db
+    restart: always
+    volumes:
+      - nextcloud_db:/var/lib/postgresql/data
+
+
+networks:
+  nextcloud_db:
+    external: true
+  proxy:
+    external: true
 
 volumes:
   nextcloud_config:
     external: true
   nextcloud_data:
+    external: true
+  nextcloud_db:
     external: true
