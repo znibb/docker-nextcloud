@@ -2,50 +2,83 @@ version: "3"
 
 services:
   nextcloud:
-    image: linuxserver/nextcloud
-    container_name: nextcloud_app
+    image: nextcloud:27
+    container_name: nextcloud
+    hostname: nc.${DOMAIN_NAME}
+    restart: unless-stopped
+    secrets:
+      - postgres_password
+    env_file: .env
+    environment:
+      - REDIS_HOST=${REDIS_HOST}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+      - NEXTCLOUD_TRUSTED_DOMAIN=nc.${DOMAIN_NAME}
+      - TRUSTED_PROXIES=${TRUSTED_PROXY}
+      - OVERWRITECLIURL=https://nc.${DOMAIN_NAME}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=nc.${DOMAIN_NAME}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nextcloud.entrypoints=https
+      - traefik.http.routers.nextcloud.rule=Host(`nc.${DOMAIN_NAME}`)
+      - traefik.http.routers.nextcloud.service=nextcloud
+      - traefik.http.routers.nextcloud.tls=true
+      - traefik.http.routers.nextcloud.tls.certresolver=cloudflare
+      - traefik.http.services.nextcloud.loadbalancer.server.port=80
+      - traefik.http.routers.nextcloud.middlewares=default@file, nextcloud_redirectregex
+      # CalDAV/CardDAV service discovery
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
+    networks:
+      - nextcloud
+      - traefik
+    volumes:
+      - ./data/storage/:/var/www/html/
     depends_on:
       - db
-    env_file:
-     - db.env
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Europe/Stockholm
-      - POSTGRES_HOST=db
-      - POSTGRES_DB=nextcloud
+      - cache
+
+  cache:
+    image: redis:7.0-alpine
+    container_name: nc-redis
+    hostname: ${REDIS_HOST}
+    restart: unless-stopped
     networks:
-      - nextcloud_db
-      - proxy
-    ports:
-      - 443:443
-    restart: always
+      - nextcloud
     volumes:
-      - nextcloud_config:/config
-      - nextcloud_data:/data
+      - ./data/cache/:/data/
 
   db:
-    image: postgres:alpine
-    container_name: nextcloud_db
-    env_file:
-      - db.env
+    image: postgres:15
+    container_name: nc-postgres
+    hostname: ${POSTGRES_HOST}
+    restart: unless-stopped
+    secrets:
+      - postgres_password
+    env_file: .env
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
     networks:
-      - nextcloud_db
-    restart: always
+      - nextcloud
     volumes:
-      - nextcloud_db:/var/lib/postgresql/data
-
+      - ./data/db/:/var/lib/postgresql/data/
 
 networks:
-  nextcloud_db:
-    external: true
-  proxy:
-    external: true
+  nextcloud:
+    name: nextcloud
+    driver: bridge
+  traefik:
+    external:
+      name: traefik
 
-volumes:
-  nextcloud_config:
-    external: true
-  nextcloud_data:
-    external: true
-  nextcloud_db:
-    external: true
+secrets:
+  redis_password:
+    file: ./secrets/REDIS_PASSWORD.secret
+  postgres_password:
+    file: ./secrets/POSTGRES_PASSWORD.secret
