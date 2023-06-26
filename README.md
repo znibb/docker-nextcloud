@@ -5,7 +5,7 @@ Docker image for running Nextcloud behind a Traefik instance using PostgresQL as
 1. Input your domain name and trusted local subnet in `.env`
 1. Input your Postgres password in `secrets/POSTGRES_PASSWORD.secret`
 1. Input your Redis password in `secrets/REDIS_PASSWORD.secret`
-1. Create a bridge Docker network called `traefik`
+1. Make sure that Docker network `traefik` exists, `docker network ls`
 1. Run `docker-compose up` and check logs
 
 ## Troubleshooting
