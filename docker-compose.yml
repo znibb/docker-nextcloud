@@ -1,0 +1,77 @@
+services:
+  nextcloud:
+    image: nextcloud:29.0.2
+    container_name: nextcloud
+    restart: unless-stopped
+    secrets:
+      - postgres_password
+    env_file:
+      - .env
+    environment:
+      REDIS_HOST: nc-redis
+      POSTGRES_HOST: nc-postgres
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      NEXTCLOUD_TRUSTED_DOMAIN: nc.${TRAEFIK_DOMAIN:?}
+      TRUSTED_PROXIES: ${TRUSTED_PROXY:?}
+      OVERWRITECLIURL: https://nc.${TRAEFIK_DOMAIN:?}
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: nc.${TRAEFIK_DOMAIN:?}
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nextcloud.entrypoints=https
+      - traefik.http.routers.nextcloud.rule=Host(`nc.${TRAEFIK_DOMAIN:?}`)
+      - traefik.http.routers.nextcloud.tls=true
+      - traefik.http.routers.nextcloud.tls.certresolver=cloudflare
+      - traefik.http.services.nextcloud.loadbalancer.server.port=80
+      - traefik.http.routers.nextcloud.middlewares=default@file, nextcloud_redirectregex
+      # CalDAV/CardDAV service discovery
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.regex=https://(.*)/.well-known/(?:card|cal)dav
+      - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.replacement=https://$${1}/remote.php/dav
+    networks:
+      - nextcloud
+      - traefik
+    volumes:
+      - ./data/storage/:/var/www/html/
+    depends_on:
+      - db
+      - cache
+
+  cache:
+    image: redis:7.0-alpine
+    container_name: nc-redis
+    restart: unless-stopped
+    networks:
+      - nextcloud
+    volumes:
+      - ./data/cache/:/data/
+
+  db:
+    image: postgres:15
+    container_name: nc-postgres
+    restart: unless-stopped
+    secrets:
+      - postgres_password
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    networks:
+      - nextcloud
+    volumes:
+      - ./data/db/:/var/lib/postgresql/data/
+
+networks:
+  nextcloud:
+    name: nextcloud
+    internal: true
+  traefik:
+    external: true
+
+secrets:
+  postgres_password:
+    file: ./secrets/POSTGRES_PASSWORD.secret
