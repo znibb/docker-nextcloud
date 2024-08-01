@@ -46,7 +46,7 @@ services:
     networks:
       - nextcloud
     volumes:
-      - ./data/cache/:/data/
+      - cache:/data/
 
   db:
     image: postgres:15
@@ -75,3 +75,7 @@ networks:
 secrets:
   postgres_password:
     file: ./secrets/POSTGRES_PASSWORD.secret
+
+volumes:
+  cache:
+    name: nextcloud-cache
