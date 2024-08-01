@@ -5,3 +5,4 @@ fi
 if [ ! -f secrets/POSTGRES_PASSWORD.secret ]; then
     touch secrets/POSTGRES_PASSWORD.secret
 fi
+mkdir -p ./data/{db,storage}
