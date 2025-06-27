@@ -1,6 +1,6 @@
 services:
   nextcloud:
-    image: nextcloud:29.0.2
+    image: nextcloud:31.0.6
     container_name: nextcloud
     restart: unless-stopped
     secrets:
@@ -8,23 +8,26 @@ services:
     env_file:
       - .env
     environment:
-      REDIS_HOST: nc-redis
-      POSTGRES_HOST: nc-postgres
+      REDIS_HOST: nextcloud-cache
+      POSTGRES_HOST: nextcloud-db
       POSTGRES_DB: ${POSTGRES_DB:?}
       POSTGRES_USER: ${POSTGRES_USER:?}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       NEXTCLOUD_TRUSTED_DOMAIN: nc.${TRAEFIK_DOMAIN:?}
+      NEXTCLOUD_ADMIN_USER: ${ADMIN_USER:?}
+      NEXTCLOUD_ADMIN_PASSWORD: ${ADMIN_PASSWORD:?}
       TRUSTED_PROXIES: ${TRUSTED_PROXY:?}
       OVERWRITECLIURL: https://nc.${TRAEFIK_DOMAIN:?}
       OVERWRITEPROTOCOL: https
       OVERWRITEHOST: nc.${TRAEFIK_DOMAIN:?}
+      NC_default_phone_region: SE
     labels:
       - traefik.enable=true
-      - traefik.http.routers.nextcloud.entrypoints=https
+      - traefik.http.services.nextcloud.loadbalancer.server.port=80
       - traefik.http.routers.nextcloud.rule=Host(`nc.${TRAEFIK_DOMAIN:?}`)
+      - traefik.http.routers.nextcloud.entrypoints=https
       - traefik.http.routers.nextcloud.tls=true
       - traefik.http.routers.nextcloud.tls.certresolver=cloudflare
-      - traefik.http.services.nextcloud.loadbalancer.server.port=80
       - traefik.http.routers.nextcloud.middlewares=default@file, nextcloud_redirectregex
       # CalDAV/CardDAV service discovery
       - traefik.http.middlewares.nextcloud_redirectregex.redirectregex.permanent=true
@@ -34,14 +37,15 @@ services:
       - nextcloud
       - traefik
     volumes:
-      - ./data/storage/:/var/www/html/
+      - config:/var/www/html
+      - /mnt/nextcloud:/var/www/html/data
     depends_on:
       - db
       - cache
 
   cache:
-    image: redis:7.0-alpine
-    container_name: nc-redis
+    image: valkey/valkey:8.1.2-alpine
+    container_name: nextcloud-cache
     restart: unless-stopped
     networks:
       - nextcloud
@@ -49,9 +53,15 @@ services:
       - cache:/data/
 
   db:
-    image: postgres:15
-    container_name: nc-postgres
+    image: postgres:17.5-alpine
+    container_name: nextcloud-db
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB:?} -U $${POSTGRES_USER:?}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
     secrets:
       - postgres_password
     env_file:
@@ -63,12 +73,11 @@ services:
     networks:
       - nextcloud
     volumes:
-      - ./data/db/:/var/lib/postgresql/data/
+      - db:/var/lib/postgresql/data/
 
 networks:
   nextcloud:
     name: nextcloud
-    internal: true
   traefik:
     external: true
 
@@ -79,3 +88,7 @@ secrets:
 volumes:
   cache:
     name: nextcloud-cache
+  config:
+    name: nextcloud-config
+  db:
+    name: nextcloud-db

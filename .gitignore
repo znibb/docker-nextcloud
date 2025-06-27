@@ -1,5 +1,2 @@
-data/*
-!data/.gitkeep
 secrets/*
-!secrets/.gitkeep
 .env
