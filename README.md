@@ -1,8 +1,9 @@
 # docker-nextcloud
-Docker setup for running Nextcloud behind a Traefik instance using PostgresQL as database and Redis as cache
+Docker setup for running Nextcloud behind a Traefik instance using PostgresQL as database and Valkey as a Redis replacement for cache
 
 ## Setup
 First we need to set up the TrueNAS NFS share that will store our user uploaded data
+
 ### TrueNAS NFS Share
 We're using named docker volumes to store the cache, database and general Nextcloud config. For user uploaded data we're using an NFS share exported on our TrueNAS machine. Nextcloud runs as www-data with user:group 33:33 internally.
 
