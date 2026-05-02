@@ -42,8 +42,8 @@ Additionally you need to set up the regular handling of maintenance tasks by add
 ```
 to docker user crontab (`crontab -e`)
 
-### Authentik
-Check the [Authentik](https://github.com/znibb/docker-authentik?tab=readme-ov-file#432-nextcloud-settings) readme for how to setup user provisioning
+## Authentik setup
+See [Authentik](https://github.com/znibb/docker-authentik) repo
 
 ## Troubleshooting
 * Fix `no default phone region set`
